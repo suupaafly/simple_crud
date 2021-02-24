@@ -1,0 +1,9 @@
+.cache/
+.idea/
+.tox/
+__pycache__/
+local.py
+logs/
+venv/
+requirements.txt
+
