@@ -1,3 +1,5 @@
+import time
+
 import logging
 
 import fastapi
@@ -5,8 +7,10 @@ from sqlalchemy import orm
 
 import crud
 import database
+import metrics
 import schemas
 from config import settings
+import _version
 
 log = logging.getLogger('user_crud')
 
@@ -22,6 +26,27 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+metrics.METRICS_INFO.info({'version': _version.__version__})
+
+
+@app.middleware('http')
+async def metrics_middleware(request: fastapi.Request, call_next):
+    start_time = time.perf_counter()
+    response = await call_next(request)
+
+    req_latency = time.perf_counter() - start_time
+    path = request.scope.get('path')
+    metrics.METRICS_REQUEST_LATENCY.labels(request.method, path).observe(req_latency)
+    metrics.METRICS_REQUEST_COUNT.labels(request.method, path, response.status_code).inc()
+    return response
+
+
+@app.get('/metrics')
+def get_metrics():
+    from prometheus_client import generate_latest
+    return generate_latest()
 
 
 @app.get('/ping')
